@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  portfolio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: group7-portfolio:latest
+    container_name: group7-portfolio-local
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+    # We mount the source files so changes during development reflect immediately 
+    # without needing to rebuild the image manually (for local dev only)
+    volumes:
+      - ./index.html:/usr/share/nginx/html/index.html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro

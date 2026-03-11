@@ -1,0 +1,16 @@
+version: '3.8'
+
+# This compose file is meant to be run alongside the main one, or includes the main one.
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.cache.yml up -d
+
+services:
+  # The cache container acts as a reverse proxy to the portfolio container
+  portfolio-cache:
+    image: nginx:alpine
+    container_name: group7-local-cdn
+    ports:
+      - "8081:80" # The cache will be available on port 8081 locally
+    volumes:
+      - ./nginx-cache.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - portfolio

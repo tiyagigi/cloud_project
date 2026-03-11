@@ -1,0 +1,78 @@
+name: Terraform Plan
+
+on:
+  pull_request:
+    branches:
+      - main
+
+env:
+  TF_VERSION: "1.5.0" # Match your target environment or `var` appropriately
+
+jobs:
+  terraform-plan:
+    name: "Terraform Plan"
+    runs-on: ubuntu-latest
+    
+    # Needs to checkout the code and setup aws credentials
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false # Needed to extract the raw text later
+
+      # Initialize Terraform (Focus on DNS Phase 2)
+      - name: Terraform Init DNS
+        id: init_dns
+        run: terraform init
+        working-directory: ./terraform/dns
+
+      # Plan DNS
+      - name: Terraform Plan DNS
+        id: plan_dns
+        run: terraform plan -no-color -out=tfplan
+        working-directory: ./terraform/dns
+        continue-on-error: true
+
+      # Use a third-party action or GitHub script to comment on the PR
+      - name: Update PR with Plan
+        uses: actions/github-script@v6
+        if: github.event_name == 'pull_request'
+        env:
+          PLAN: "terraform\n${{ steps.plan_dns.outputs.stdout }}"
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            // This script posts the Terraform plan as a comment on the PR
+            const output = `#### Terraform DNS Plan 📖\`${{ steps.plan_dns.outcome }}\`
+            
+            <details><summary>Show Plan</summary>
+            
+            \`\`\`hcl
+            ${process.env.PLAN}
+            \`\`\`
+            
+            </details>
+            
+            *Pushed by: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })
+
+      - name: Fail on Plan Error
+        if: steps.plan_dns.outcome == 'failure'
+        run: exit 1
