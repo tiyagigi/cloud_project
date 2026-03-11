@@ -2,97 +2,87 @@
 
 ---
 
-## Slide 1: Introduction and Objective
+## Slide 1: Introduction & Objective
 **Global Content Delivery & GitOps Pipeline Setup**
 
-**Why we did this project:**
-The goal of this project is to demonstrate a modern DevOps lifecycle by building out a complete CI/CD pipeline and Infrastructure-as-Code (IaC) deployment for a web portfolio. Instead of manually clicking through a cloud console to set up servers, we wanted to show how to automate infrastructure creation, secure our credentials, and instantly deploy code changes to a global Content Delivery Network (CDN) using GitHub Actions.
-
-**Core Technologies Used:**
-- **Docker / Docker Compose:** For local containerization and testing.
-- **Nginx:** As our web server and proxy cache.
-- **Terraform (IaC):** To automate the AWS infrastructure setup.
-- **AWS (S3, CloudFront, IAM):** For hosting and distributing the portfolio globally.
-- **GitHub Actions (CI/CD):** For continuous integration and automated deployments.
+*   **Why we did this project:** To demonstrate a modern DevOps lifecycle. Instead of manually clicking through a cloud console (which is slow and error-prone), we built an automated pipeline using "Infrastructure as Code" (IaC). This allows us to instantly and securely deploy code changes to a global Content Delivery Network (CDN).
+*   **Technologies:** Docker, Nginx, Terraform, AWS (CloudFront, S3, IAM), GitHub Actions.
 
 ---
 
-## Slide 2: Application Architecture
-**How the Portfolio runs locally vs. globally:**
+## Slide 2: The DevOps Process Overview
+**Our automated workflow from code to production:**
 
-*   **HTML/Tailwind CSS:** The portfolio itself is lightweight, rendering standard HTML and styled via Tailwind CSS for rapid UI development.
-*   **Local Nginx Proxy:** To simulate global caching, a custom local Nginx proxy acts as a "CDN".
-    *   Visiting `localhost:8080` hits the raw Nginx app container.
-    *   Visiting `localhost:8081` hits a separate Proxy container, showing us caching metrics.
-
----
-
-## Slide 3: Step-by-Step Setup
-**How we built this environment:**
-
-**Step 1: Local Docker Setup**
-We containerized the portfolio to ensure it runs identically everywhere.
-*Command used:* `docker-compose -f docker-compose.yml -f docker-compose.cache.yml up -d`
-
-**Step 2: AWS Security**
-We created a strict AWS IAM User (`github-actions-user`) with an Access Key inside the AWS Console, keeping our main AWS root account credentials safe.
-
-**Step 3: GitHub Secrets**
-We securely loaded the exact AWS credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) into our GitHub repository settings (`Settings -> Secrets and variables -> Actions`) so high-level GitHub automated processes can securely act on our behalf.
+1.  **Develop:** We write HTML/Tailwind code locally and test it using Docker containers.
+2.  **Commit & Push:** Code changes are pushed to our GitHub repository.
+3.  **Continuous Integration (CI):** GitHub Actions automatically checks the code and runs a `terraform plan` to propose infrastructure changes on Pull Requests.
+4.  **Continuous Delivery (CD):** Once merged to the `main` branch, GitHub Actions securely logs into AWS, applies any Terraform changes, and invalidates (clears) the CDN cache.
+5.  **Serve:** Users globally receive the updated portfolio instantly from the nearest AWS CloudFront edge location.
 
 ---
 
-## Slide 4: Infrastructure as Code (Terraform)
-**Automating AWS with Terraform:**
+## Slide 3: Step 1 - Local Containerization (Docker)
+**Ensuring the app runs identically everywhere:**
 
-Instead of manual setup, we codified our infrastructure.
-*   **CDN Terraform (Part 2):**
-    *   Provisions an AWS S3 Bucket to hold the website assets.
-    *   Provisions an AWS CloudFront Distribution (CDN) to globally cache and serve the assets.
-*   *Implementation:* We created a manual trigger in GitHub Actions (`tf-apply-cdn.yml`) that authenticates to AWS via our secrets and automatically runs `terraform init` and `terraform apply -auto-approve` in a secure cloud runner.
-
----
-
-## Slide 5: The CI/CD Pipeline (GitHub Actions)
-**Automating the Development Lifecycle:**
-
-We build complete continuous integration and delivery loops.
-1.  **Pull Request Workflow (`tf-plan.yml`):**
-    *   When a developer opens a Pull Request to `main`, an Action runs `terraform plan`.
-    *   It comments the proposed AWS infrastructure changes on the PR for review before building anything.
-2.  **CDN Invalidation (`invalidate-cache.yml`):**
-    *   When changes are merged into `main`, GitHub Actions automatically logs into AWS using CLI credentials.
-    *   It issues a `aws cloudfront create-invalidation` command, instantly purging old content from Edge servers globally and ensuring end-users see the newest portfolio updates.
+Before deploying to the cloud, we built a local environment to simulate our production servers and CDN caching mechanism.
+*   **Action:** We configured a `docker-compose.yml` and `docker-compose.cache.yml` to spin up two Nginx containers.
+*   **Command:** `docker-compose -f docker-compose.yml -f docker-compose.cache.yml up -d`
+*   **Result:** Container 1 acts as the backend origin web server (Port 8080). Container 2 acts as the proxy CDN cache layer (Port 8081).
 
 ---
 
-## Slide 6: Live Demonstration
-**Proving the Local Cache Works:**
+## Slide 4: Step 2 - Securing the Pipeline
+**Connecting GitHub to AWS safely:**
 
-To demonstrate the Content Delivery Network caching locally, we curl our proxy server to view the `X-Proxy-Cache` response header:
+We needed GitHub Actions to deploy servers on our behalf without exposing our passwords publicly.
+*   **AWS Setup:** Created a strictly scoped AWS IAM User (`github-actions-user`) with programmatic Access Keys.
+*   **GitHub Setup:** Stored these keys securely under `Settings -> Secrets and variables -> Actions` (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`).
+*   **Result:** Our CI/CD pipeline can now securely build AWS resources on the fly.
+
+---
+
+## Slide 5: Step 3 - Infrastructure as Code (Terraform)
+**Automating the Cloud Infrastructure:**
+
+Instead of manual setup, we wrote Terraform scripts to build our CDN infrastructure programmatically.
+*   **The Code:** `terraform/cdn/main.tf` defines an AWS S3 Bucket (to hold files) and an AWS CloudFront Distribution (to cache files globally).
+*   **The Execution:** We created a GitHub Action (`tf-apply-cdn.yml`) that logs into AWS using our secrets and automatically runs `terraform apply -auto-approve`.
+*   **Result:** The entire production environment is built automatically in minutes.
+
+---
+
+## Slide 6: Step 4 - Continuous Integration (CI)
+**Automated Pull Request Checks:**
+
+*   **The Workflow:** `tf-plan.yml`
+*   **The Process:** Whenever a developer tries to merge code into the `main` branch, a GitHub Action runs `terraform plan`.
+*   **Result:** It automatically comments the proposed AWS infrastructure changes directly onto the GitHub Pull Request. This allows the team to review and approve exactly what will change in AWS before it actually happens.
+
+---
+
+## Slide 7: Step 5 - Continuous Delivery (CD)
+**Automated Cache Invalidation:**
+
+*   **The Workflow:** `invalidate-cache.yml`
+*   **The Process:** When code is finally merged into `main`, old cache files need to be deleted so users see the new updates.
+*   **Result:** GitHub Actions runs the AWS CLI command `aws cloudfront create-invalidation`. This instantly purges the old website from Edge servers globally, delivering the fresh code.
+
+---
+
+## Slide 8: Live Demonstration
+**Proving the Caching Mechanism Works:**
+
+To prove our local CDN proxy works just like AWS CloudFront, we can inspect the response headers.
 
 *Command executed in PowerShell:* 
 `curl.exe -I http://localhost:8081`
 
-**Expected Output:**
+*Expected Output:*
 ```text
 HTTP/1.1 200 OK
 Server: nginx/1.29.6
 Date: Wed, 11 Mar 2026 18:56:27 GMT 
-Content-Type: text/html
 Content-Length: 11665
-Connection: keep-alive
 X-Proxy-Cache: HIT
 ```
-*Result:* Seeing `HIT` confirms our Content Delivery System intercepted the request, found the site already saved in its cache, and delivered it to us instantly without triggering our backend server!
-
----
-
-## Slide 7: Summary and Project Outcomes
-**End-to-End Delivery Realized:**
-
-*   **Scalable:** The static app is fully containerized and caching is optimized.
-*   **Automated:** Our infrastructure creates itself (Terraform) and our code deploys itself (GitHub Actions).
-*   **Secure:** PR checks ensure bad infrastructure changes aren't merged, while secret management keeps the pipeline secure.
-
-**Project complete!**
+*Conclusion:* Seeing `HIT` confirms that our proxy intercepted the request, found the site already saved in its cache, and delivered it instantly without hitting our backend web server!
